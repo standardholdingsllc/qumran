@@ -747,9 +747,10 @@
         const penguinMaterial = new THREE.SpriteMaterial({ map: penguinTexture });
         const penguin = new THREE.Sprite(penguinMaterial);
         penguin.scale.set(0.6, 0.6, 1); 
-        // Move to Scriptorium corner (Room 30) - Adjusted for visibility
-        // Placing it in the clear aisle between the tables and the east wall, at the far end.
-        penguin.position.set(7.5, 0.5, 5.0); 
+        // Move to Scriptorium aisle (between the tables)
+        // Tables are at x=5.2 and x=6.9. Center is ~6.05.
+        // User requested spot in screenshot: in the aisle, on the floor.
+        penguin.position.set(6.05, 0.35, 0); 
         penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
