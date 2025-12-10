@@ -636,6 +636,9 @@
 
         // West Filler (Connecting South and North blocks on the west side)
         createRoof(-4.5, 0, 3.5, 4.2);
+        
+        // Courtyard Center (Full Coverage per request)
+        createRoof(-1, 0, 4.2, 4.2);
 
         const room13 = createFloorRect("Room 13: Passage", 2, -0.5, 2, 8, floorMaterial, { desc: "Transition hall linking the court to the scriptorium." });
 
@@ -648,7 +651,7 @@
         createTextLabel("2", room2.position.x, 1.8, room2.position.z);
         createTextLabel("4", room4.position.x, 1.8, room4.position.z);
         createTextLabel("13", room13.position.x, 1.8, room13.position.z + 1);
-        createTextLabel("12", room12.position.x, 1.8, room12.position.z);
+        createTextLabel("Workshop", room12.position.x, 1.8, room12.position.z);
         createTextLabel("30", room30.position.x, 1.8, room30.position.z);
 
         // Walls (per diagram proportions)
@@ -745,7 +748,8 @@
         const penguin = new THREE.Sprite(penguinMaterial);
         penguin.scale.set(0.6, 0.6, 1); 
         // Move to Scriptorium corner (Room 30) - Adjusted for visibility
-        penguin.position.set(7.0, 0.6, 5.0); 
+        // Placing it in the clear aisle between the tables and the east wall, at the far end.
+        penguin.position.set(7.5, 0.5, 5.0); 
         penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
