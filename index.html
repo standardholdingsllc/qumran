@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khirbet Qumran: FPV Experience</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #000; user-select: none; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
+        
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 10;
+            pointer-events: none; 
+        }
+        h1 { margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-size: 2rem; letter-spacing: 1px; }
+        p.subtitle { margin-top: 5px; font-size: 1rem; opacity: 0.8; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
+        .instructions { font-size: 0.9rem; color: #ffaa00; margin-top: 10px; }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 10px; height: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* Tooltip/Label */
+        #tooltip {
+            position: absolute;
+            top: 55%; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 15, 0.9);
+            border: 1px solid #c2b280;
+            color: #f0e6d2;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            pointer-events: none;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+        #tooltip h3 { margin: 0 0 8px 0; color: #e6c88b; font-size: 1.1rem; border-bottom: 1px solid #555; padding-bottom: 5px;}
+        #tooltip p { margin: 0; font-size: 0.9rem; line-height: 1.4; }
+
+        /* Blockers / Menus */
+        #blocker {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+        #instructions-box {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid #c2b280;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #instructions-box:hover { background: rgba(255,255,255,0.2); }
+        .key { display: inline-block; padding: 4px 8px; border: 1px solid white; border-radius: 4px; margin: 0 2px; font-weight: bold; background: rgba(0,0,0,0.5); }
+
+        #controls-ui {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 10;
+        }
+        button.toggle-btn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 30px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        button.toggle-btn:hover { background: rgba(255, 255, 255, 0.4); }
+
+        #room-info {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            max-width: 360px;
+            padding: 16px 18px;
+            background: rgba(12, 10, 8, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f7f1e3;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+        }
+        #room-info h3 { margin: 0 0 6px 0; color: #ffd27f; font-size: 1.1rem; }
+        #room-info p { margin: 0 0 6px 0; line-height: 1.3; font-size: 0.95rem; }
+        #fact-list { margin: 6px 0 0 0; padding-left: 16px; }
+        #fact-list li { margin: 3px 0; color: #bfe3ff; font-size: 0.9rem; }
+        .pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        #day-cycle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        #light-slider {
+            width: 180px;
+        }
+
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="blocker">
+        <div id="instructions-box">
+            <h1 style="margin-bottom: 20px;">Click to Start</h1>
+            <p>Move: <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span></p>
+            <p>Look: Mouse</p>
+            <p>Unlock Cursor: <span class="key">ESC</span></p>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <h1>Qumran Main Building</h1>
+        <p class="subtitle">South West Quadrant | 1st Century CE</p>
+        <p class="instructions">WASD to move • Mouse to look • Slide day/night to change time.</p>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="tooltip">
+        <h3 id="tt-title">Object</h3>
+        <p id="tt-desc">Description.</p>
+    </div>
+
+    <div id="controls-ui">
+        <div id="day-cycle">
+            <span style="font-size:0.9rem;">☀️</span>
+            <input id="light-slider" type="range" min="0" max="1" step="0.01" value="0">
+            <span style="font-size:0.9rem;">🌙</span>
+        </div>
+        <button id="toggle-light" class="toggle-btn">Toggle Day/Night</button>
+    </div>
+
+    <div id="room-info">
+        <div class="pill" id="zone-pill">Approach the doorway</div>
+        <h3 id="room-title">Welcome to Qumran</h3>
+        <p id="room-desc">Wander with WASD and the mouse. Look at objects for context. Drag the slider to fade between day and lamplit night.</p>
+        <ul id="fact-list">
+            <li>Built by the Qumran community along the Dead Sea.</li>
+            <li>Artifacts: ink wells, plastered benches, jars, oil lamps.</li>
+        </ul>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // --- Configuration ---
+        const CONFIG = {
+            wallColor: 0xd2c6a8, 
+            floorColor: 0x8b7d6b,
+            roomHeight: 3,
+            eyeHeight: 1.6, // Meters
+            moveSpeed: 5.0,
+            collisionRadius: 0.5
+        };
+
+        // --- Global State ---
+        let isNight = false;
+        let dayNightAmount = 0; // 0 = day, 1 = night
+        let interactables = [];
+        let lamps = [];
+        let collidableMeshList = []; // Walls for collision
+
+        // Movement State
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let prevTime = performance.now();
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        // --- Scene Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); 
+        scene.fog = new THREE.Fog(0x87CEEB, 0, 40);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(2, CONFIG.eyeHeight, 8); // Start entrance area
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // --- Controls (PointerLock) ---
+        const controls = new PointerLockControls(camera, document.body);
+
+        const blocker = document.getElementById('blocker');
+        const instructions = document.getElementById('instructions-box');
+
+        instructions.addEventListener('click', function () {
+            controls.lock();
+        });
+
+        controls.addEventListener('lock', function () {
+            blocker.style.display = 'none';
+        });
+
+        controls.addEventListener('unlock', function () {
+            blocker.style.display = 'flex';
+        });
+
+        scene.add(controls.getObject());
+
+        // Key Listeners
+        const onKeyDown = function (event) {
+            switch (event.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = true; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+                case 'ArrowRight': case 'KeyD': moveRight = true; break;
+            }
+        };
+
+        const onKeyUp = function (event) {
+            switch (event.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = false; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+                case 'ArrowRight': case 'KeyD': moveRight = false; break;
+            }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+
+        // --- Materials & Textures ---
+        const textureLoader = new THREE.TextureLoader();
+        
+        function createNoiseTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#d2c6a8';
+            ctx.fillRect(0,0,128,128);
+            for(let i=0; i<800; i++) {
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.15})`;
+                ctx.fillRect(Math.random()*128, Math.random()*128, 2, 2);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(2,2);
+            return tex;
+        }
+
+        const wallMaterial = new THREE.MeshStandardMaterial({ map: createNoiseTexture(), roughness: 0.9, color: CONFIG.wallColor });
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: CONFIG.floorColor, roughness: 1.0 });
+        const potteryMaterial = new THREE.MeshStandardMaterial({ color: 0xb5651d, roughness: 0.6 });
+        const plasterMaterial = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 });
+
+
+        // --- Construction & Environment ---
+
+        const world = new THREE.Group();
+        scene.add(world);
+
+        // Terrain & exterior context
+        const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xcbb48a, roughness: 1, map: createNoiseTexture() });
+        const groundGeo = new THREE.PlaneGeometry(120, 120, 64, 64);
+        const ground = new THREE.Mesh(groundGeo, sandMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        const pos = ground.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            pos.setY(i, (Math.random() * 0.6) - 0.3); // gentle dunes
+        }
+        pos.needsUpdate = true;
+        ground.receiveShadow = true;
+        world.add(ground);
+
+        // Path from outside up to the entrance
+        const path = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), new THREE.MeshStandardMaterial({ color: 0x7b6a55, roughness: 0.9 }));
+        path.rotation.x = -Math.PI / 2;
+        path.position.set(-1, 0.02, -8);
+        world.add(path);
+
+        // Dead Sea shimmer off in the distance
+        const sea = new THREE.Mesh(new THREE.PlaneGeometry(40, 20), new THREE.MeshPhysicalMaterial({
+            color: 0x4fa3f7, metalness: 0.15, roughness: 0.25, transparent: true, opacity: 0.65, clearcoat: 0.15
+        }));
+        sea.rotation.x = -Math.PI / 2;
+        sea.position.set(34, 0.05, -10);
+        world.add(sea);
+
+        // Background cliffs to frame the scene
+        const cliffMat = new THREE.MeshStandardMaterial({ color: 0x7f7264, roughness: 0.9 });
+        function addCliff(x, z, w, d, h) {
+            const c = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cliffMat);
+            c.position.set(x, h / 2, z);
+            c.castShadow = true;
+            c.receiveShadow = true;
+            world.add(c);
+        }
+        addCliff(-22, 0, 12, 60, 4);
+        addCliff(18, 20, 40, 10, 5);
+        addCliff(50, 0, 10, 60, 6);
+
+        // --- Helper factories ---
+        function createWallSegment(x1, z1, x2, z2, height = CONFIG.roomHeight, thickness = 0.35) {
+            const length = Math.hypot(x2 - x1, z2 - z1);
+            const geometry = new THREE.BoxGeometry(length, height, thickness);
+            const wall = new THREE.Mesh(geometry, wallMaterial);
+            wall.position.set((x1 + x2) / 2, height / 2, (z1 + z2) / 2);
+            wall.rotation.y = Math.atan2(z2 - z1, x2 - x1);
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            scene.add(wall);
+            collidableMeshList.push(wall);
+            return wall;
+        }
+
+        function createFloorRect(name, x, z, width, depth, material = floorMaterial, info = {}) {
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), material);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.set(x, 0.01, z);
+            floor.receiveShadow = true;
+            floor.userData = { title: name, desc: info.desc || "" };
+            floor.name = name;
+            scene.add(floor);
+            interactables.push(floor);
+            return floor;
+        }
+
+        function createTextLabel(text, x, y, z) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(20,18,12,0.9)';
+            ctx.fillRect(0, 0, 256, 128);
+            ctx.fillStyle = '#ffd27f';
+            ctx.font = 'bold 64px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 128, 64);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+            sprite.scale.set(1.2, 0.6, 1);
+            sprite.position.set(x, y, z);
+            scene.add(sprite);
+            return sprite;
+        }
+
+        // Shared props
+        const jarGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.6, 8);
+        const jarLid = new THREE.CylinderGeometry(0.21, 0.21, 0.1, 8);
+        function createJar(x, z, label) {
+            const jar = new THREE.Mesh(jarGeo, potteryMaterial);
+            jar.position.set(x, 0.3, z);
+            jar.castShadow = true;
+            const lid = new THREE.Mesh(jarLid, potteryMaterial);
+            lid.position.set(0, 0.35, 0);
+            jar.add(lid);
+            jar.userData = { title: label || "Storage Jar", desc: "Cylindrical jar with pointed base to sit in the packed soil floor." };
+            scene.add(jar);
+            interactables.push(jar);
+            collidableMeshList.push(jar);
+            return jar;
+        }
+
+        function createBench(x, z, w = 1.6, h = 0.5, d = 0.5) {
+            const bench = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), plasterMaterial);
+            bench.position.set(x, h / 2, z);
+            bench.castShadow = true;
+            bench.receiveShadow = true;
+            scene.add(bench);
+            collidableMeshList.push(bench);
+            return bench;
+        }
+
+        function createScriptoriumTable(x, z) {
+            const tableGeo = new THREE.BoxGeometry(1, 0.6, 6);
+            const table = new THREE.Mesh(tableGeo, plasterMaterial);
+            table.position.set(x, 0.3, z);
+            table.castShadow = true;
+            table.userData = { title: "Plastered Table", desc: "Mud-brick base with a plastered top; broad enough for parchment preparation." };
+            scene.add(table);
+            interactables.push(table);
+            collidableMeshList.push(table);
+
+            const benchGeo = new THREE.BoxGeometry(0.6, 0.4, 6);
+            const bench = new THREE.Mesh(benchGeo, plasterMaterial);
+            bench.position.set(x - 1, 0.2, z);
+            bench.castShadow = true;
+            scene.add(bench);
+            collidableMeshList.push(bench);
+        }
+
+        // --- Blueprint: match the archaeological plan (rooms 1,2,4,13,12,30) ---
+        const room1 = createFloorRect("Room 1: Pantry", -4.5, -4.5, 3, 3, floorMaterial, { desc: "Storage for foodstuffs and dry goods. Packed earth floor with heavy jars." });
+        const room2 = createFloorRect("Room 2: Assembly/Dining", -1.5, -4.5, 3, 3, floorMaterial, { desc: "Communal dining and assembly. Close to courtyard and kitchen gear." });
+        const room4 = createFloorRect("Room 4: Courtyard", -1, 0, 4, 4, plasterMaterial, { desc: "Central plastered court with a water feature and support pillar." });
+        const room13 = createFloorRect("Room 13: Passage", 2, -0.5, 2, 8, floorMaterial, { desc: "Transition hall linking the court to the scriptorium." });
+        const room12 = createFloorRect("Room 12: Workshop", -3, 4.5, 3, 2, floorMaterial, { desc: "Small workroom north of the court, likely for repairs and lamp refilling." });
+        const room30 = createFloorRect("Room 30: The Scriptorium", 6, 0, 3.5, 12, floorMaterial, { desc: "Long hall with plastered tables where scrolls were written." });
+
+        // Room labels for quick orientation
+        createTextLabel("1", room1.position.x, 1.8, room1.position.z);
+        createTextLabel("2", room2.position.x, 1.8, room2.position.z);
+        createTextLabel("4", room4.position.x, 1.8, room4.position.z);
+        createTextLabel("13", room13.position.x, 1.8, room13.position.z + 1);
+        createTextLabel("12", room12.position.x, 1.8, room12.position.z);
+        createTextLabel("30", room30.position.x, 1.8, room30.position.z);
+
+        // Walls (per diagram proportions)
+        // Main block outer shell
+        createWallSegment(-6, -6, -6, 6); // west
+        createWallSegment(-6, 6, 4, 6);   // north
+        createWallSegment(4, 6, 4, 0.8);  // east upper
+        createWallSegment(4, -0.8, 4, -6); // east lower leaving a doorway to passage
+        createWallSegment(-6, -6, -2.2, -6); // south west
+        createWallSegment(-0.2, -6, 4, -6);  // south east with entry gap near -1..-0.2
+
+        // Interior divisions
+        createWallSegment(-3, -6, -3, -3); // between room1 & room2
+        createWallSegment(-6, -3, -3, -3); // room1 north
+        createWallSegment(-3, -3, -1.6, -3); // room2 north part
+        createWallSegment(-0.4, -3, 1, -3);  // room2 north continues leaving doorway
+        createWallSegment(1, -6, 1, -1);     // passage west wall lower
+        createWallSegment(1, 1, 1, 2);       // passage west wall upper with doorway to court
+
+        createWallSegment(4, -6, 4, -1.2);   // scriptorium west wall lower (door gap)
+        createWallSegment(4, 1.2, 4, 6);     // scriptorium west wall upper
+        createWallSegment(1, 2, 2, 2);       // passage north partial
+        createWallSegment(3, 2, 4, 2);       // passage north partial (door to 12)
+
+        // Room 12 enclosure with a doorway on its south
+        createWallSegment(-5, 3.5, -2.7, 3.5);
+        createWallSegment(-2.3, 3.5, -1, 3.5);
+        createWallSegment(-5, 3.5, -5, 5.5);
+        createWallSegment(-1, 3.5, -1, 5.5);
+        createWallSegment(-5, 5.5, -1, 5.5);
+
+        // Scriptorium outer walls
+        createWallSegment(4, 6, 8, 6);
+        createWallSegment(8, 6, 8, -6);
+        createWallSegment(8, -6, 4, -6);
+
+        // Courtyard water feature & column
+        const basin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, 1.2), plasterMaterial);
+        basin.position.set(-1, 0.2, 0.6);
+        basin.castShadow = true;
+        basin.receiveShadow = true;
+        basin.userData = { title: "Plastered Basin", desc: "A shallow plastered basin—possibly for washing hands and tools." };
+        scene.add(basin);
+        interactables.push(basin);
+
+        const water = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.2, 1), new THREE.MeshPhysicalMaterial({
+            color: 0x6db1ff, transparent: true, opacity: 0.5, roughness: 0.15, metalness: 0.05, clearcoat: 0.2
+        }));
+        water.position.set(-1, 0.35, 0.6);
+        scene.add(water);
+
+        const column = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 2.7, 12), plasterMaterial);
+        column.position.set(-0.8, 1.35, -0.4);
+        column.castShadow = true;
+        column.userData = { title: "Roof Support Column", desc: "Helped carry a light roof over the courtyard." };
+        scene.add(column);
+        interactables.push(column);
+        collidableMeshList.push(column);
+
+        // Furniture & artifacts
+        createBench(-1.2, -2.2, 2.2, 0.45, 0.5); // bench along south of courtyard
+        createBench(-4.5, -3.2, 2.8, 0.45, 0.5); // bench in pantry
+        createBench(-1.5, -4.0, 2.2, 0.45, 0.5); // bench in room2
+
+        createJar(-4.4, -5.2, "Storage Jar with Grain");
+        createJar(-3.8, -4.9, "Storage Jar with Oil");
+        createJar(-4.9, -4.4, "Storage Jar with Dates");
+        createJar(-1.2, -4.8, "Serving Pot");
+        createJar(-0.6, -4.5, "Water Jar");
+
+        // Scriptorium furniture and inkwells
+        createScriptoriumTable(5.2, 0);
+        createScriptoriumTable(6.9, 0);
+
+        const inkwellGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.15, 12);
+        function addInkwell(x, z) {
+            const ink = new THREE.Mesh(inkwellGeo, potteryMaterial);
+            ink.position.set(x, 0.65, z);
+            ink.userData = { title: "Cylindrical Inkwell", desc: "One of the two ink wells recovered—traces of carbon ink still visible." };
+            scene.add(ink);
+            interactables.push(ink);
+            return ink;
+        }
+        addInkwell(5.2, -1.6);
+        addInkwell(6.9, 1.4);
+
+        // Passage props
+        createJar(2, -4.5, "Lamp Oil Jar");
+
+        // --- EASTER EGG: The User's Penguin ---
+        const penguinTexture = textureLoader.load('./image_dd26b9.png'); 
+        penguinTexture.colorSpace = THREE.SRGBColorSpace;
+        const penguinMaterial = new THREE.SpriteMaterial({ map: penguinTexture });
+        const penguin = new THREE.Sprite(penguinMaterial);
+        penguin.scale.set(0.6, 0.6, 1); 
+        penguin.position.set(-4.7, 0.42, -5.4); // Hidden in the pantry corner
+        penguin.userData = { title: "Cool Penguin", desc: "You found the Easter Egg! 🕶️" };
+        scene.add(penguin);
+        interactables.push(penguin);
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffdfba, 1.6);
+        sunLight.position.set(20, 30, 10);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.set(2048, 2048);
+        scene.add(sunLight);
+
+        function createOilLampLight(x, y, z) {
+            const light = new THREE.PointLight(0xffaa33, 0, 8);
+            light.position.set(x, y, z);
+            scene.add(light);
+            const lampGeo = new THREE.SphereGeometry(0.05);
+            const lampMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const mesh = new THREE.Mesh(lampGeo, lampMat);
+            mesh.position.set(x, y - 0.1, z);
+            mesh.visible = false;
+            scene.add(mesh);
+            return { light, mesh, baseInt: 1.8 };
+        }
+        lamps.push(createOilLampLight(5.2, 1.1, 0));
+        lamps.push(createOilLampLight(6.9, 1.1, 0));
+        lamps.push(createOilLampLight(-1, 1.2, 0.4));
+        lamps.push(createOilLampLight(-4.4, 1.1, -4.8));
+        lamps.push(createOilLampLight(-1.4, 1.1, -4.4));
+
+        // --- Interaction Logic (Raycasting from Center) ---
+        const raycaster = new THREE.Raycaster();
+        const center = new THREE.Vector2(0, 0); // Always cast from center of screen
+        const tooltip = document.getElementById('tooltip');
+        const titleEl = document.getElementById('tt-title');
+        const descEl = document.getElementById('tt-desc');
+        const roomTitleEl = document.getElementById('room-title');
+        const roomDescEl = document.getElementById('room-desc');
+        const zonePillEl = document.getElementById('zone-pill');
+        const factListEl = document.getElementById('fact-list');
+
+        const roomZones = [
+            {
+                name: "Entrance & Exterior",
+                box: new THREE.Box3(new THREE.Vector3(-8, 0, -12), new THREE.Vector3(2, 3, -7)),
+                desc: "You're outside the southwest quadrant. Follow the packed-earth path to step inside.",
+                facts: [
+                    "The Dead Sea shimmered just to the east of Qumran.",
+                    "The settlement sat on a desert plateau, exposed to sun and dust-laden winds."
+                ]
+            },
+            {
+                name: "Room 1: Pantry",
+                box: new THREE.Box3(new THREE.Vector3(-6, 0, -6), new THREE.Vector3(-3, 3, -3)),
+                desc: "Cooler, shaded storage. Jars held dates, oil, and perhaps parchment supplies.",
+                facts: [
+                    "Cylindrical jars with tall necks helped keep contents clean and dry.",
+                    "Carbonized date pits and wheat chaff were recovered nearby."
+                ]
+            },
+            {
+                name: "Room 2: Assembly/Dining",
+                box: new THREE.Box3(new THREE.Vector3(-3, 0, -6), new THREE.Vector3(1, 3, -3)),
+                desc: "Benches ringed the room for shared meals and deliberation.",
+                facts: [
+                    "Simple clay bowls and plates were common tableware.",
+                    "Oil lamps left soot staining along the walls."
+                ]
+            },
+            {
+                name: "Room 4: Courtyard",
+                box: new THREE.Box3(new THREE.Vector3(-3, 0, -2), new THREE.Vector3(1, 3, 2)),
+                desc: "A plastered hub connecting all spaces. The basin made quick washing easy.",
+                facts: [
+                    "The column hints a light roof once shaded the space.",
+                    "Foot traffic polished the plaster smooth over time."
+                ]
+            },
+            {
+                name: "Room 13: Passage",
+                box: new THREE.Box3(new THREE.Vector3(1, 0, -5), new THREE.Vector3(3, 3, 3)),
+                desc: "Narrow corridor controlling access to the scriptorium.",
+                facts: [
+                    "A jar of lamp oil sat ready for night writing.",
+                    "Doorways here likely used wooden lintels and simple curtains."
+                ]
+            },
+            {
+                name: "Room 12: Workshop",
+                box: new THREE.Box3(new THREE.Vector3(-5, 0, 3.5), new THREE.Vector3(-1, 3, 5.5)),
+                desc: "Small workspace north of the courtyard—perfect for lamp prep and quick fixes.",
+                facts: [
+                    "Tiny sherds and ash flecks suggest hands-on tasks here.",
+                    "Close to the passage for easy handoff to scribes."
+                ]
+            },
+            {
+                name: "Room 30: Scriptorium",
+                box: new THREE.Box3(new THREE.Vector3(4, 0, -6), new THREE.Vector3(8, 3, 6)),
+                desc: "Two long plastered tables for scribes. Ink wells and lamps kept writing steady.",
+                facts: [
+                    "Two cylindrical ink wells with dried carbon ink were recovered here.",
+                    "Benches align along the tables—writers faced the same direction.",
+                    "Scrolls from Qumran caves may have begun on these very tables."
+                ]
+            }
+        ];
+
+        let activeZone = null;
+
+        function updateZoneInfo(position) {
+            let found = null;
+            for (const zone of roomZones) {
+                if (zone.box.containsPoint(position)) {
+                    found = zone;
+                    break;
+                }
+            }
+
+            if (found && found !== activeZone) {
+                activeZone = found;
+                zonePillEl.innerText = found.name;
+                roomTitleEl.innerText = found.name;
+                roomDescEl.innerText = found.desc;
+                factListEl.innerHTML = "";
+                found.facts.forEach(f => {
+                    const li = document.createElement('li');
+                    li.textContent = f;
+                    factListEl.appendChild(li);
+                });
+            }
+        }
+
+        function checkInteractions() {
+            raycaster.setFromCamera(center, camera);
+            const intersects = raycaster.intersectObjects(interactables, false);
+
+            if (intersects.length > 0) {
+                const found = intersects[0].object;
+                if (found.userData && found.userData.title) {
+                    tooltip.style.display = 'block';
+                    titleEl.innerText = found.userData.title;
+                    descEl.innerText = found.userData.desc;
+                    if(found.material.emissive) found.material.emissive.setHex(0x333333);
+                }
+            } else {
+                tooltip.style.display = 'none';
+                interactables.forEach(obj => {
+                    if(obj.material && obj.material.emissive) obj.material.emissive.setHex(0x000000);
+                });
+            }
+        }
+
+        // --- Day/Night Adjustor (slider + quick toggle) ---
+        const lightSlider = document.getElementById('light-slider');
+        const toggleBtn = document.getElementById('toggle-light');
+        const skyDay = new THREE.Color(0x87CEEB);
+        const skyNight = new THREE.Color(0x050510);
+
+        function applyDayNight(value) {
+            dayNightAmount = THREE.MathUtils.clamp(value, 0, 1);
+            isNight = dayNightAmount > 0.15;
+            const blendColor = skyDay.clone().lerp(skyNight, dayNightAmount);
+            scene.background = blendColor;
+            scene.fog.color.copy(blendColor);
+
+            ambientLight.intensity = THREE.MathUtils.lerp(0.65, 0.12, dayNightAmount);
+            sunLight.intensity = 1.6 * (1 - dayNightAmount);
+            const sunPosDay = new THREE.Vector3(20, 30, 10);
+            const sunPosNight = new THREE.Vector3(-10, 8, -5);
+            sunLight.position.copy(sunPosDay.lerp(sunPosNight, dayNightAmount));
+
+            lamps.forEach(l => {
+                l.light.intensity = l.baseInt * dayNightAmount;
+                l.mesh.visible = dayNightAmount > 0.15;
+            });
+        }
+
+        lightSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            applyDayNight(val);
+        });
+
+        toggleBtn.addEventListener('click', () => {
+            const target = dayNightAmount > 0.4 ? 0 : 1;
+            lightSlider.value = target;
+            applyDayNight(target);
+        });
+
+        applyDayNight(0);
+
+        // --- Collision Helper ---
+        function checkCollision(position) {
+            // Simple bounding box checks against all walls
+            const playerBox = new THREE.Box3().setFromCenterAndSize(position, new THREE.Vector3(0.5, 2, 0.5));
+            
+            for (let i = 0; i < collidableMeshList.length; i++) {
+                const wallBox = new THREE.Box3().setFromObject(collidableMeshList[i]);
+                if (playerBox.intersectsBox(wallBox)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (controls.isLocked === true) {
+                const time = performance.now();
+                const delta = (time - prevTime) / 1000;
+
+                // Resistance
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+
+                // Direction
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize(); // Ensure consistent speed in all directions
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+
+                // Predict Next Position
+                const oldPos = camera.position.clone();
+                
+                // Move Right/Left
+                controls.moveRight(-velocity.x * delta);
+                if (checkCollision(camera.position)) camera.position.x = oldPos.x;
+
+                // Move Forward/Back
+                const oldZ = camera.position.z;
+                controls.moveForward(-velocity.z * delta);
+                if (checkCollision(camera.position)) camera.position.z = oldZ;
+
+                prevTime = time;
+            } else {
+                prevTime = performance.now();
+            }
+
+            checkInteractions();
+            updateZoneInfo(camera.position);
+
+            // Candle flicker when in night range
+            if(dayNightAmount > 0.15) {
+                lamps.forEach(l => {
+                    l.light.intensity = (l.baseInt * dayNightAmount) + (Math.random() * 0.35 - 0.18);
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+
+    </script>
+</body>
+</html>
