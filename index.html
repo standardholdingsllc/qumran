@@ -742,35 +742,34 @@
         createJar(2, -4.5, "Lamp Oil Jar");
 
         // --- EASTER EGG: The User's Penguin ---
-        // Create sprite - using PlaneGeometry with custom material for better control
-        const penguinMaterial = new THREE.SpriteMaterial({ 
+        // Using a Mesh with PlaneGeometry for proper texture rendering and depth testing
+        const penguinGeometry = new THREE.PlaneGeometry(1.0, 1.4);
+        const penguinMaterial = new THREE.MeshBasicMaterial({
             transparent: true,
             alphaTest: 0.5,
-            depthTest: false,    // IMPORTANT: Render on top of geometry
-            depthWrite: false,
-            sizeAttenuation: true
+            side: THREE.DoubleSide,  // Visible from both sides
+            depthTest: true,         // Respect depth (won't show through walls)
+            depthWrite: true
         });
-        const penguin = new THREE.Sprite(penguinMaterial);
-        penguin.scale.set(1.0, 1.4, 1);
-        // Position in scriptorium - between the two tables
-        // Tables are at x=5.2 and x=6.9, so center is ~6.05
-        // Raise slightly so it's clearly above floor
-        penguin.position.set(6.0, 1.0, 3.0);  
-        penguin.renderOrder = 999;
+        const penguin = new THREE.Mesh(penguinGeometry, penguinMaterial);
+        
+        // Position in scriptorium - between the two tables, standing on floor
+        // Tables are at x=5.2 and x=6.9. Place penguin at x=6.0, z=3.0
+        // Y = 0.7 (half of height 1.4) so bottom touches floor
+        penguin.position.set(6.0, 0.7, 3.0);
         penguin.frustumCulled = false;
         penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
         
-        // Load texture with callback
+        // Load texture
         textureLoader.load(
             './image_dd26b9.png',
             (texture) => {
                 texture.colorSpace = THREE.SRGBColorSpace;
-                texture.needsUpdate = true;
                 penguinMaterial.map = texture;
                 penguinMaterial.needsUpdate = true;
-                console.log('Penguin texture loaded!');
+                console.log('Penguin texture loaded successfully!');
             },
             undefined,
             (err) => console.error('Penguin texture error:', err)
@@ -1038,8 +1037,17 @@
                 });
             }
 
-            // Note: THREE.Sprite objects automatically billboard (face the camera)
-            // No manual lookAt() needed - it would actually break the sprite rendering!
+            // Billboard effect for penguin - rotate to face camera (Y-axis only to stay upright)
+            if (penguin) {
+                const penguinPos = penguin.position;
+                const cameraPos = camera.position;
+                // Calculate angle to camera on XZ plane
+                const angle = Math.atan2(
+                    cameraPos.x - penguinPos.x,
+                    cameraPos.z - penguinPos.z
+                );
+                penguin.rotation.y = angle;
+            }
             
             renderer.render(scene, camera);
         }

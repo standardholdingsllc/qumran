@@ -30,7 +30,7 @@ An immersive first-person virtual tour of the ancient Qumran settlement, home to
 - Zone-based room information panel
 
 ### 🐧 Easter Egg
-A time-traveling penguin with sunglasses can be found hiding in Room 30 (the Scriptorium). Look for him between the two plastered writing tables! As a `THREE.Sprite`, he automatically billboards to always face you as you explore.
+A time-traveling penguin with sunglasses can be found hiding in Room 30 (the Scriptorium). Look for him between the two plastered writing tables! He uses a `THREE.Mesh` with `PlaneGeometry` and custom billboard logic to always face the camera while respecting wall occlusion.
 
 ## Technical Architecture
 
