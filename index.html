@@ -173,7 +173,7 @@
     <div id="controls-ui">
         <div id="day-cycle">
             <span style="font-size:0.9rem;">☀️</span>
-            <input id="light-slider" type="range" min="0" max="1" step="0.01" value="0.6">
+            <input id="light-slider" type="range" min="0" max="1" step="0.01" value="0">
             <span style="font-size:0.9rem;">🌙</span>
         </div>
         <button id="toggle-light" class="toggle-btn">Toggle Day/Night</button>
@@ -344,6 +344,7 @@
         }
 
         const wallMaterial = new THREE.MeshStandardMaterial({ map: createNoiseTexture(), roughness: 0.9, color: CONFIG.wallColor });
+        const roofMaterial = new THREE.MeshStandardMaterial({ map: createNoiseTexture(), roughness: 1.0, color: 0x8b7d6b }); // Dirt/clay roof
         const floorMaterial = new THREE.MeshStandardMaterial({ color: CONFIG.floorColor, roughness: 1.0 });
         const potteryMaterial = new THREE.MeshStandardMaterial({ color: 0xb5651d, roughness: 0.6 });
         const plasterMaterial = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 });
@@ -575,7 +576,7 @@
             jar.userData = { title: label || "Storage Jar", desc: "Cylindrical jar with pointed base to sit in the packed soil floor." };
             scene.add(jar);
             interactables.push(jar);
-            collidableMeshList.push(jar);
+            // collidableMeshList.push(jar); // Removed collision per request
             return jar;
         }
 
@@ -585,7 +586,7 @@
             bench.castShadow = true;
             bench.receiveShadow = true;
             scene.add(bench);
-            collidableMeshList.push(bench);
+            // collidableMeshList.push(bench); // Removed collision per request
             return bench;
         }
 
@@ -597,23 +598,47 @@
             table.userData = { title: "Plastered Table", desc: "Mud-brick base with a plastered top; broad enough for parchment preparation." };
             scene.add(table);
             interactables.push(table);
-            collidableMeshList.push(table);
+            // collidableMeshList.push(table); // Removed collision per request
 
             const benchGeo = new THREE.BoxGeometry(0.6, 0.4, 6);
             const bench = new THREE.Mesh(benchGeo, plasterMaterial);
             bench.position.set(x - 1, 0.2, z);
             bench.castShadow = true;
             scene.add(bench);
-            collidableMeshList.push(bench);
+            // collidableMeshList.push(bench); // Removed collision per request
+        }
+
+        function createRoof(x, z, w, d) {
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), roofMaterial);
+            roof.position.set(x, CONFIG.roomHeight, z);
+            roof.castShadow = true;
+            roof.receiveShadow = true;
+            scene.add(roof);
+            return roof;
         }
 
         // --- Blueprint: match the archaeological plan (rooms 1,2,4,13,12,30) ---
         const room1 = createFloorRect("Room 1: Pantry", -4.5, -4.5, 3, 3, floorMaterial, { desc: "Storage for foodstuffs and dry goods. Packed earth floor with heavy jars." });
+        createRoof(-4.5, -4.5, 3.2, 3.2);
+
         const room2 = createFloorRect("Room 2: Assembly/Dining", -1.5, -4.5, 3, 3, floorMaterial, { desc: "Communal dining and assembly. Close to courtyard and kitchen gear." });
+        createRoof(-1.5, -4.5, 3.2, 3.2);
+
         const room4 = createFloorRect("Room 4: Courtyard", -1, 0, 4, 4, plasterMaterial, { desc: "Central plastered court with a water feature and support pillar." });
+        // Courtyard partially roofed around edges or fully open? Usually open. 
+        // User asked for "a clay/dirt period roof to the building". 
+        // I'll add partial roofing over the walkways/edges of the courtyard to simulate overhangs.
+        createRoof(-1, -1.8, 4.2, 0.8); // South overhang
+        createRoof(-2.8, 0, 0.8, 4.2); // West overhang
+
         const room13 = createFloorRect("Room 13: Passage", 2, -0.5, 2, 8, floorMaterial, { desc: "Transition hall linking the court to the scriptorium." });
+        createRoof(2, -0.5, 2.2, 8.2);
+
         const room12 = createFloorRect("Room 12: Workshop", -3, 4.5, 3, 2, floorMaterial, { desc: "Small workroom north of the court, likely for repairs and lamp refilling." });
+        createRoof(-3, 4.5, 3.2, 2.2);
+
         const room30 = createFloorRect("Room 30: The Scriptorium", 6, 0, 3.5, 12, floorMaterial, { desc: "Long hall with plastered tables where scrolls were written." });
+        createRoof(6, 0, 3.8, 12.2);
 
         // Room labels for quick orientation
         createTextLabel("1", room1.position.x, 1.8, room1.position.z);
@@ -716,7 +741,9 @@
         const penguinMaterial = new THREE.SpriteMaterial({ map: penguinTexture });
         const penguin = new THREE.Sprite(penguinMaterial);
         penguin.scale.set(0.6, 0.6, 1); 
-        penguin.position.set(-4.7, 0.42, -5.4); // Hidden in the pantry corner
+        // Move to Scriptorium corner (Room 30)
+        // Room 30 is at x=6, z=0, size 3.5x12. Bounds ~ x[4.25, 7.75], z[-6, 6]
+        penguin.position.set(7.2, 0.42, 5.5); 
         penguin.userData = { title: "Cool Penguin", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
@@ -915,12 +942,12 @@
         });
 
         toggleBtn.addEventListener('click', () => {
-            const target = dayNightAmount > 0.4 ? 0 : 0.6; // Toggle between day (0) and default night (0.6)
+            const target = dayNightAmount > 0.4 ? 0 : 0.6; 
             lightSlider.value = target;
             applyDayNight(target);
         });
 
-        applyDayNight(0.6); // Start at dusk/night
+        applyDayNight(0); // Default to day per request
 
         // --- Collision Helper ---
         function checkCollision(position) {
