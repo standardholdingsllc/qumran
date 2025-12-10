@@ -619,26 +619,29 @@
 
         // --- Blueprint: match the archaeological plan (rooms 1,2,4,13,12,30) ---
         const room1 = createFloorRect("Room 1: Pantry", -4.5, -4.5, 3, 3, floorMaterial, { desc: "Storage for foodstuffs and dry goods. Packed earth floor with heavy jars." });
-        createRoof(-4.5, -4.5, 3.2, 3.2);
-
+        
         const room2 = createFloorRect("Room 2: Assembly/Dining", -1.5, -4.5, 3, 3, floorMaterial, { desc: "Communal dining and assembly. Close to courtyard and kitchen gear." });
-        createRoof(-1.5, -4.5, 3.2, 3.2);
 
         const room4 = createFloorRect("Room 4: Courtyard", -1, 0, 4, 4, plasterMaterial, { desc: "Central plastered court with a water feature and support pillar." });
-        // Courtyard partially roofed around edges or fully open? Usually open. 
-        // User asked for "a clay/dirt period roof to the building". 
-        // I'll add partial roofing over the walkways/edges of the courtyard to simulate overhangs.
-        createRoof(-1, -1.8, 4.2, 0.8); // South overhang
-        createRoof(-2.8, 0, 0.8, 4.2); // West overhang
+        
+        // Comprehensive Roof Coverage (leaving only the Courtyard center open)
+        // South Block (Rooms 1 & 2) - slight overlap into courtyard for overhang
+        createRoof(-2.5, -4.1, 7.5, 4.2); 
+        
+        // North Block (Room 12 & undefined north areas)
+        createRoof(-2.5, 4.1, 7.5, 4.2);
+
+        // East Block (Passage + Scriptorium) - Covers entire east wing
+        createRoof(4.6, 0, 7.2, 12.4);
+
+        // West Filler (Connecting South and North blocks on the west side)
+        createRoof(-4.5, 0, 3.5, 4.2);
 
         const room13 = createFloorRect("Room 13: Passage", 2, -0.5, 2, 8, floorMaterial, { desc: "Transition hall linking the court to the scriptorium." });
-        createRoof(2, -0.5, 2.2, 8.2);
 
         const room12 = createFloorRect("Room 12: Workshop", -3, 4.5, 3, 2, floorMaterial, { desc: "Small workroom north of the court, likely for repairs and lamp refilling." });
-        createRoof(-3, 4.5, 3.2, 2.2);
 
         const room30 = createFloorRect("Room 30: The Scriptorium", 6, 0, 3.5, 12, floorMaterial, { desc: "Long hall with plastered tables where scrolls were written." });
-        createRoof(6, 0, 3.8, 12.2);
 
         // Room labels for quick orientation
         createTextLabel("1", room1.position.x, 1.8, room1.position.z);
@@ -741,10 +744,9 @@
         const penguinMaterial = new THREE.SpriteMaterial({ map: penguinTexture });
         const penguin = new THREE.Sprite(penguinMaterial);
         penguin.scale.set(0.6, 0.6, 1); 
-        // Move to Scriptorium corner (Room 30)
-        // Room 30 is at x=6, z=0, size 3.5x12. Bounds ~ x[4.25, 7.75], z[-6, 6]
-        penguin.position.set(7.2, 0.42, 5.5); 
-        penguin.userData = { title: "Cool Penguin", desc: "You found the Easter Egg! 🕶️" };
+        // Move to Scriptorium corner (Room 30) - Adjusted for visibility
+        penguin.position.set(7.0, 0.6, 5.0); 
+        penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
 
