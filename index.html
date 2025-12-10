@@ -173,7 +173,7 @@
     <div id="controls-ui">
         <div id="day-cycle">
             <span style="font-size:0.9rem;">☀️</span>
-            <input id="light-slider" type="range" min="0" max="1" step="0.01" value="0">
+            <input id="light-slider" type="range" min="0" max="1" step="0.01" value="0.6">
             <span style="font-size:0.9rem;">🌙</span>
         </div>
         <button id="toggle-light" class="toggle-btn">Toggle Day/Night</button>
@@ -233,6 +233,8 @@
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 160);
         camera.position.set(-1, CONFIG.eyeHeight, -10); // Start at entry approach
+        camera.up.set(0, 1, 0); // Ensure camera is always upright
+
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -240,14 +242,15 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // Aim camera toward the complex entry from the path
-        camera.lookAt(0, CONFIG.eyeHeight, 0);
-        const dirInit = new THREE.Vector3();
-        camera.getWorldDirection(dirInit);
-        // Standardize Yaw: atan2(x, z) gives angle from +Z. 
-        // Camera looks -Z by default. We need to offset by PI to align the camera's local -Z with the target direction.
-        yaw = Math.atan2(dirInit.x, dirInit.z) + Math.PI;
-        pitch = dirInit.y; // Simplified pitch from direction y component
+        // Initialize direction manually to avoid lookAt issues
+        // We want to look roughly at (0, 0, 0) from (-1, 1.6, -10)
+        // Direction is approx (1, -1.6, 10), flattened to (1, 0, 10). 
+        // Z diff is +10. So we face +Z.
+        // Default camera looks -Z. So we need PI rotation.
+        yaw = Math.PI; 
+        pitch = 0;
+        camera.rotation.set(pitch, yaw, 0); // Explicitly set rotation
+
 
         const blocker = document.getElementById('blocker');
         const instructions = document.getElementById('instructions-box');
@@ -261,8 +264,7 @@
         // Manual look (click and drag)
         camera.rotation.order = 'YXZ';
         function syncCameraRotation() {
-            camera.rotation.y = yaw;
-            camera.rotation.x = pitch;
+            camera.rotation.set(pitch, yaw, 0, 'YXZ');
         }
 
         container.addEventListener('mousedown', (e) => {
@@ -913,12 +915,12 @@
         });
 
         toggleBtn.addEventListener('click', () => {
-            const target = dayNightAmount > 0.4 ? 0 : 1;
+            const target = dayNightAmount > 0.4 ? 0 : 0.6; // Toggle between day (0) and default night (0.6)
             lightSlider.value = target;
             applyDayNight(target);
         });
 
-        applyDayNight(0);
+        applyDayNight(0.6); // Start at dusk/night
 
         // --- Collision Helper ---
         function checkCollision(position) {
