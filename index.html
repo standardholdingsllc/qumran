@@ -148,17 +148,17 @@
 
     <div id="blocker">
         <div id="instructions-box">
-            <h1 style="margin-bottom: 20px;">Click to Start</h1>
+            <h1 style="margin-bottom: 20px;">Click to Begin</h1>
             <p>Move: <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span></p>
-            <p>Look: Mouse</p>
-            <p>Unlock Cursor: <span class="key">ESC</span></p>
+            <p>Look: click and drag</p>
+            <p>Cursor stays free for UI</p>
         </div>
     </div>
 
     <div id="ui-layer">
         <h1>Qumran Main Building</h1>
         <p class="subtitle">South West Quadrant | 1st Century CE</p>
-        <p class="instructions">WASD to move • Mouse to look • Slide day/night to change time.</p>
+        <p class="instructions">WASD to move • Click + drag to look • Use the slider to change day/night.</p>
     </div>
 
     <div id="crosshair"></div>
@@ -191,7 +191,7 @@
 
     <script type="module">
         import * as THREE from 'three';
-        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { Sky } from 'three/addons/objects/Sky.js';
 
         // --- Configuration ---
         const CONFIG = {
@@ -216,17 +216,20 @@
         let moveLeft = false;
         let moveRight = false;
         let prevTime = performance.now();
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
+        let yaw = 0;
+        let pitch = 0;
+        let isDragging = false;
+        let lastMouse = new THREE.Vector2();
+        let started = false;
 
         // --- Scene Setup ---
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB); 
-        scene.fog = new THREE.Fog(0x87CEEB, 0, 40);
+        scene.fog = new THREE.Fog(0x87CEEB, 8, 140);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(2, CONFIG.eyeHeight, 8); // Start entrance area
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 160);
+        camera.position.set(-1, CONFIG.eyeHeight, -10); // Start at entry approach
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -234,25 +237,49 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // --- Controls (PointerLock) ---
-        const controls = new PointerLockControls(camera, document.body);
+        // Aim camera toward the complex entry from the path
+        camera.lookAt(0, CONFIG.eyeHeight, 0);
+        const dirInit = new THREE.Vector3();
+        camera.getWorldDirection(dirInit);
+        yaw = Math.atan2(dirInit.x, dirInit.z);
+        pitch = Math.asin(dirInit.y);
 
         const blocker = document.getElementById('blocker');
         const instructions = document.getElementById('instructions-box');
 
         instructions.addEventListener('click', function () {
-            controls.lock();
-        });
-
-        controls.addEventListener('lock', function () {
+            started = true;
             blocker.style.display = 'none';
+            prevTime = performance.now();
         });
 
-        controls.addEventListener('unlock', function () {
-            blocker.style.display = 'flex';
+        // Manual look (click and drag)
+        camera.rotation.order = 'YXZ';
+        function syncCameraRotation() {
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+        }
+
+        container.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                isDragging = true;
+                lastMouse.set(e.clientX, e.clientY);
+            }
         });
 
-        scene.add(controls.getObject());
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - lastMouse.x;
+            const dy = e.clientY - lastMouse.y;
+            lastMouse.set(e.clientX, e.clientY);
+            yaw -= dx * 0.0025;
+            pitch -= dy * 0.0025;
+            const limit = Math.PI / 2 - 0.1;
+            pitch = Math.max(-limit, Math.min(limit, pitch));
+            syncCameraRotation();
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
 
         // Key Listeners
         const onKeyDown = function (event) {
@@ -307,35 +334,60 @@
         const world = new THREE.Group();
         scene.add(world);
 
+        // Sky dome
+        const sky = new Sky();
+        sky.scale.setScalar(45000);
+        scene.add(sky);
+        if (sky.material && sky.material.uniforms) {
+            sky.material.uniforms['turbidity'].value = 2.5;
+            sky.material.uniforms['rayleigh'].value = 2.0;
+            sky.material.uniforms['mieCoefficient'].value = 0.002;
+            sky.material.uniforms['mieDirectionalG'].value = 0.8;
+        }
+
         // Terrain & exterior context
         const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xcbb48a, roughness: 1, map: createNoiseTexture() });
-        const groundGeo = new THREE.PlaneGeometry(120, 120, 64, 64);
+        const groundGeo = new THREE.PlaneGeometry(200, 200, 96, 96);
         const ground = new THREE.Mesh(groundGeo, sandMaterial);
         ground.rotation.x = -Math.PI / 2;
         const pos = ground.geometry.attributes.position;
         for (let i = 0; i < pos.count; i++) {
-            pos.setY(i, (Math.random() * 0.6) - 0.3); // gentle dunes
+            pos.setY(i, (Math.random() * 0.8) - 0.4); // gentle dunes
         }
         pos.needsUpdate = true;
         ground.receiveShadow = true;
         world.add(ground);
 
         // Path from outside up to the entrance
-        const path = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), new THREE.MeshStandardMaterial({ color: 0x7b6a55, roughness: 0.9 }));
+        const path = new THREE.Mesh(new THREE.PlaneGeometry(12, 3.5), new THREE.MeshStandardMaterial({ color: 0x7b6a55, roughness: 0.9 }));
         path.rotation.x = -Math.PI / 2;
-        path.position.set(-1, 0.02, -8);
+        path.position.set(-1, 0.02, -10.5);
         world.add(path);
 
-        // Dead Sea shimmer off in the distance
-        const sea = new THREE.Mesh(new THREE.PlaneGeometry(40, 20), new THREE.MeshPhysicalMaterial({
-            color: 0x4fa3f7, metalness: 0.15, roughness: 0.25, transparent: true, opacity: 0.65, clearcoat: 0.15
+        // Small greener pasture patches for visual variety
+        const pastureMat = new THREE.MeshStandardMaterial({ color: 0x9da974, roughness: 1, opacity: 0.9, transparent: true });
+        function addPatch(x, z, w, d, r) {
+            const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), pastureMat);
+            p.rotation.x = -Math.PI / 2;
+            p.position.set(x, 0.025, z);
+            p.rotation.z = r || 0;
+            p.receiveShadow = true;
+            world.add(p);
+        }
+        addPatch(-6, -5, 8, 5, 0.2);
+        addPatch(6, 6, 10, 6, -0.15);
+        addPatch(12, -4, 8, 4, 0.1);
+
+        // Dead Sea shimmer far on the horizon
+        const sea = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), new THREE.MeshPhysicalMaterial({
+            color: 0x4fa3f7, metalness: 0.15, roughness: 0.25, transparent: true, opacity: 0.55, clearcoat: 0.15
         }));
         sea.rotation.x = -Math.PI / 2;
-        sea.position.set(34, 0.05, -10);
+        sea.position.set(85, -0.05, -20);
         world.add(sea);
 
         // Background cliffs to frame the scene
-        const cliffMat = new THREE.MeshStandardMaterial({ color: 0x7f7264, roughness: 0.9 });
+        const cliffMat = new THREE.MeshStandardMaterial({ color: 0xa48b72, roughness: 0.92 });
         function addCliff(x, z, w, d, h) {
             const c = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cliffMat);
             c.position.set(x, h / 2, z);
@@ -343,9 +395,38 @@
             c.receiveShadow = true;
             world.add(c);
         }
-        addCliff(-22, 0, 12, 60, 4);
-        addCliff(18, 20, 40, 10, 5);
-        addCliff(50, 0, 10, 60, 6);
+        addCliff(-26, 0, 14, 70, 3.5);
+        addCliff(26, 30, 50, 12, 3.2);
+        addCliff(70, -10, 12, 80, 4.5);
+
+        // Sparse palms / shrubs
+        function addPalm(x, z, scale = 1) {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08*scale, 0.1*scale, 2*scale, 8), new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 }));
+            trunk.position.set(x, 1*scale, z);
+            trunk.castShadow = true;
+            const crown = new THREE.Mesh(new THREE.SphereGeometry(0.5*scale, 8, 8), new THREE.MeshStandardMaterial({ color: 0x4f9a57, roughness: 0.6 }));
+            crown.position.set(0, 0.7*scale, 0);
+            trunk.add(crown);
+            world.add(trunk);
+        }
+        addPalm(-8, -9, 0.9);
+        addPalm(4, -12, 0.8);
+        addPalm(10, 8, 1.1);
+        addPalm(15, -6, 0.7);
+        addPalm(-12, 5, 0.65);
+
+        // Soft billboard clouds
+        const cloudMat = new THREE.SpriteMaterial({ color: 0xffffff, opacity: 0.5 });
+        function addCloud(x, y, z, s) {
+            const c = new THREE.Sprite(cloudMat.clone());
+            c.scale.set(s, s * 0.6, 1);
+            c.position.set(x, y, z);
+            scene.add(c);
+        }
+        addCloud(-10, 25, -30, 18);
+        addCloud(15, 28, -40, 22);
+        addCloud(30, 24, -10, 15);
+        addCloud(45, 22, 10, 17);
 
         // --- Helper factories ---
         function createWallSegment(x1, z1, x2, z2, height = CONFIG.roomHeight, thickness = 0.35) {
@@ -721,6 +802,11 @@
             const sunPosDay = new THREE.Vector3(20, 30, 10);
             const sunPosNight = new THREE.Vector3(-10, 8, -5);
             sunLight.position.copy(sunPosDay.lerp(sunPosNight, dayNightAmount));
+            if (sky.material && sky.material.uniforms && sky.material.uniforms['sunPosition']) {
+                sky.material.uniforms['sunPosition'].value.copy(sunLight.position);
+                sky.material.uniforms['turbidity'].value = THREE.MathUtils.lerp(2.5, 6.0, dayNightAmount);
+                sky.material.uniforms['rayleigh'].value = THREE.MathUtils.lerp(2.0, 0.5, dayNightAmount);
+            }
 
             lamps.forEach(l => {
                 l.light.intensity = l.baseInt * dayNightAmount;
@@ -759,33 +845,28 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            if (controls.isLocked === true) {
+            syncCameraRotation();
+
+            if (started) {
                 const time = performance.now();
                 const delta = (time - prevTime) / 1000;
 
-                // Resistance
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
+                const forwardFlat = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+                const rightFlat = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forwardFlat).normalize();
 
-                // Direction
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize(); // Ensure consistent speed in all directions
+                const moveVec = new THREE.Vector3();
+                if (moveForward) moveVec.add(forwardFlat);
+                if (moveBackward) moveVec.addScaledVector(forwardFlat, -1);
+                if (moveLeft) moveVec.addScaledVector(rightFlat, -1);
+                if (moveRight) moveVec.add(rightFlat);
 
-                if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
-
-                // Predict Next Position
-                const oldPos = camera.position.clone();
-                
-                // Move Right/Left
-                controls.moveRight(-velocity.x * delta);
-                if (checkCollision(camera.position)) camera.position.x = oldPos.x;
-
-                // Move Forward/Back
-                const oldZ = camera.position.z;
-                controls.moveForward(-velocity.z * delta);
-                if (checkCollision(camera.position)) camera.position.z = oldZ;
+                if (moveVec.lengthSq() > 0) {
+                    moveVec.normalize().multiplyScalar(CONFIG.moveSpeed * delta);
+                    const target = camera.position.clone().add(moveVec);
+                    if (!checkCollision(target)) {
+                        camera.position.copy(target);
+                    }
+                }
 
                 prevTime = time;
             } else {
