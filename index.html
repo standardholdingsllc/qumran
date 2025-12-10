@@ -742,29 +742,39 @@
         createJar(2, -4.5, "Lamp Oil Jar");
 
         // --- EASTER EGG: The User's Penguin ---
-        const penguinTexture = textureLoader.load('./image_dd26b9.png'); 
-        penguinTexture.colorSpace = THREE.SRGBColorSpace;
+        // Create sprite - using PlaneGeometry with custom material for better control
         const penguinMaterial = new THREE.SpriteMaterial({ 
-            map: penguinTexture,
             transparent: true,
-            alphaTest: 0.01,  // Low threshold to preserve transparency
-            depthWrite: false,  // Prevents z-fighting with nearby geometry
-            sizeAttenuation: true  // Sprite scales with distance like real objects
+            alphaTest: 0.5,
+            depthTest: false,    // IMPORTANT: Render on top of geometry
+            depthWrite: false,
+            sizeAttenuation: true
         });
         const penguin = new THREE.Sprite(penguinMaterial);
-        // Make penguin clearly visible - approximately child-sized (1m wide x 1.4m tall)
         penguin.scale.set(1.0, 1.4, 1);
-        // Place penguin in the north end of scriptorium, away from walls
-        // Room 30 spans x≈4.25→7.75 & z≈-6→6. Center-north position for visibility.
-        // Position: (6.5, floor + half height, 4) - between the two tables, towards north
-        penguin.position.set(6.5, 0.7, 4);
-        
-        // Ensure sprite renders properly
-        penguin.renderOrder = 999;  // High render order to draw on top of most things
-        penguin.frustumCulled = false;  // Always render even if technically out of view
+        // Position in scriptorium - between the two tables
+        // Tables are at x=5.2 and x=6.9, so center is ~6.05
+        // Raise slightly so it's clearly above floor
+        penguin.position.set(6.0, 1.0, 3.0);  
+        penguin.renderOrder = 999;
+        penguin.frustumCulled = false;
         penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
+        
+        // Load texture with callback
+        textureLoader.load(
+            './image_dd26b9.png',
+            (texture) => {
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.needsUpdate = true;
+                penguinMaterial.map = texture;
+                penguinMaterial.needsUpdate = true;
+                console.log('Penguin texture loaded!');
+            },
+            undefined,
+            (err) => console.error('Penguin texture error:', err)
+        );
 
         // --- Lighting ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
@@ -1028,8 +1038,9 @@
                 });
             }
 
-            // Make sure the penguin always turns to face the player
-            penguin.lookAt(camera.position);
+            // Note: THREE.Sprite objects automatically billboard (face the camera)
+            // No manual lookAt() needed - it would actually break the sprite rendering!
+            
             renderer.render(scene, camera);
         }
 
