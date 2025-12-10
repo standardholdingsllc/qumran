@@ -753,18 +753,18 @@
         });
         const penguin = new THREE.Mesh(penguinGeometry, penguinMaterial);
         
-        // Position in scriptorium - between the two tables, standing on floor
-        // Tables are at x=5.2 and x=6.9. Place penguin at x=6.0, z=3.0
+        // Position in scriptorium - in the far north corner, away from tables
+        // Tables extend to z≈3, so place penguin at z=4.5 to avoid clipping
         // Y = 0.7 (half of height 1.4) so bottom touches floor
-        penguin.position.set(6.0, 0.7, 3.0);
+        penguin.position.set(6.0, 0.7, 4.5);
         penguin.frustumCulled = false;
         penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
         
-        // Load texture
+        // Load texture - use path without ./ for better compatibility across environments
         textureLoader.load(
-            './image_dd26b9.png',
+            'image_dd26b9.png',
             (texture) => {
                 texture.colorSpace = THREE.SRGBColorSpace;
                 penguinMaterial.map = texture;
