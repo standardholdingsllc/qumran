@@ -744,16 +744,24 @@
         // --- EASTER EGG: The User's Penguin ---
         const penguinTexture = textureLoader.load('./image_dd26b9.png'); 
         penguinTexture.colorSpace = THREE.SRGBColorSpace;
-        const penguinMaterial = new THREE.SpriteMaterial({ map: penguinTexture });
+        const penguinMaterial = new THREE.SpriteMaterial({ 
+            map: penguinTexture,
+            transparent: true,
+            alphaTest: 0.01,  // Low threshold to preserve transparency
+            depthWrite: false,  // Prevents z-fighting with nearby geometry
+            sizeAttenuation: true  // Sprite scales with distance like real objects
+        });
         const penguin = new THREE.Sprite(penguinMaterial);
-        // Slightly larger so it's clearly visible in-room (approx. human child height)
-        penguin.scale.set(0.9, 1.3, 1);
-        // Place him on the far-north-east corner of the scriptorium floor
-        // Room 30 spans x≈4→8  & z≈-6→6.  Corner picked: (7.5, 0, 5.5)
-        penguin.position.set(7.5, 0.45, 5.5);
-
-        // Always render above nearby geometry so he isn’t hidden behind tables/benches
-        penguinMaterial.depthTest = false;
+        // Make penguin clearly visible - approximately child-sized (1m wide x 1.4m tall)
+        penguin.scale.set(1.0, 1.4, 1);
+        // Place penguin in the north end of scriptorium, away from walls
+        // Room 30 spans x≈4.25→7.75 & z≈-6→6. Center-north position for visibility.
+        // Position: (6.5, floor + half height, 4) - between the two tables, towards north
+        penguin.position.set(6.5, 0.7, 4);
+        
+        // Ensure sprite renders properly
+        penguin.renderOrder = 999;  // High render order to draw on top of most things
+        penguin.frustumCulled = false;  // Always render even if technically out of view
         penguin.userData = { title: "Time Traveler", desc: "You found the Easter Egg! 🕶️" };
         scene.add(penguin);
         interactables.push(penguin);
